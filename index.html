@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Yangon Bus Route Planner</title>
+<link rel="stylesheet" href="index.css">
+<style>
+  /* CSS styles */
+  body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f2f2f2;
+  }
+  .container {
+    max-width: 800px;
+    margin: 20px auto;
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  }
+  h1 {
+    margin-top: 0;
+    text-align: center;
+    color: #333;
+  }
+  label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+  }
+  select, button {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+  }
+  button {
+    background-color: #4CAF50;
+    color: white;
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
+  button:hover {
+    background-color: #45a049;
+  }
+  #shortestPathResult {
+    margin-top: 20px;
+    text-align: center;
+    font-weight: bold;
+  }
+  svg {
+    display: block;
+    margin: 20px auto;
+    background-color: transparent;
+    max-width: 100%;
+  }
+  .edge {
+    fill: none;
+    stroke: #ccc;
+    stroke-width: 6; /* Adjust thickness of edges */
+    transition: stroke-width 0.3s; /* Smooth transition */
+  }
+  .shortest-path {
+    stroke: green;
+    stroke-width: 10; /* Increased thickness for shortest path */
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Yangon Bus Route Planner</h1>
+  <div id="shortestPathResult"></div>
+  <label for="start">Start Bus Stop:</label>
+  <select id="start"></select>
+  <label for="end">End Bus Stop:</label>
+  <select id="end"></select>
+  <button onclick="calculateShortestPath()">Calculate Shortest Path</button>
+  <label for="routeTotalDistance">Total Distance:</label>
+  <div id="routeTotalDistance"></div>
+  <svg width="800" height="600"></svg>
+</div>
+
+<script src="index.js"></script>
+<script>
+var busStops = [
+  { name: 'Sule', shortName: 'Sule', x: 100, y: 80 },
+  { name: 'Yangon Central Station', shortName: 'YCS', x: 200, y: 100 },
+  { name: 'Inya Lake', shortName: 'Inya', x: 400, y: 250 },
+  { name: 'Shwedagon Pagoda', shortName: 'Shwedagon', x: 500, y: 300 },
+  { name: 'Botataung Pagoda', shortName: 'Botataung', x: 600, y: 350 },
+  { name: 'University of Yangon', shortName: 'UoY', x: 350, y: 150 },
+  { name: 'Junction City', shortName: 'Junction City', x: 100, y: 150 },
+  { name: 'Site Pyoe yae', shortName: 'SPA', x: 100, y: 200 },
+  { name: 'Hledan', shortName: 'hleDan', x: 100, y: 250 },
+  { name: 'Thamine', shortName: 'thaMine', x: 100, y: 300 },
+  { name: 'Insein', shortName: 'Insein', x: 85, y: 350 },
+  { name: 'Photkan', shortName: 'Photkan', x: 80, y: 400 },
+  { name: 'DaNyinGone', shortName: 'DaNyinGone', x: 80, y: 450 },
+  { name: 'ShwePyiTharGwe', shortName: 'ShwePyiTharGwe', x: 80, y: 500 },
+  { name: 'UCSY', shortName: 'UCSY', x: 80, y: 550 },
+  { name: '8mile', shortName: '8mile', x: 165, y: 350 },
+  { name: 'Khayaepin lan khwael', shortName: 'Khayaepin lan khwael', x: 165, y: 400 },
+  
+  { name: 'Yangon International Airport', shortName: 'Airport', x: 300, y: 400 },
+
+];
+
+// Routes between bus stops with distances
+var edges = [
+  { source: 'Sule', target:'Yangon Central Station', distance: 3 },
+  { source: 'Yangon Central Station', target: 'Inya Lake', distance: 4 },
+  { source: '8mile', target:'Yangon Central Station', distance: 8},
+  { source: 'Yangon Central Station', target: '8mile', distance: 8 },
+  { source: '8mile', target:'Khayaepin lan khwael', distance: 4},
+  { source: 'Khayaepin lan khwael', target: '8mile', distance: 4},
+  { source: 'DaNyinGone', target:'Khayaepin lan khwael', distance: 4},
+  { source: 'Khayaepin lan khwael', target: 'DaNyinGone', distance: 4},
+
+
+  { source: 'Inya Lake', target: 'Shwedagon Pagoda', distance: 3 },
+  { source: 'Shwedagon Pagoda', target: 'Botataung Pagoda', distance: 2 },
+  
+  { source: 'Yangon Central Station', target: 'University of Yangon', distance: 3 },
+  { source: 'Yangon Central Station', target: 'Junction City', distance: 2 },
+  
+  { source: 'Yangon Central Station', target: 'Yangon International Airport', distance: 10 },
+  // Bidirectional edges for undirected graph
+  { source: 'Yangon Central Station', target: 'Sule', distance: 3 },
+  { source: 'Inya Lake', target: 'Yangon Central Station', distance: 4 },
+  { source: 'Shwedagon Pagoda', target: 'Inya Lake', distance: 3 },
+  { source: 'Botataung Pagoda', target: 'Shwedagon Pagoda', distance: 2 },
+  
+  { source: 'University of Yangon', target: 'Yangon Central Station', distance: 3 },
+  { source: 'Junction City', target: 'Yangon Central Station', distance: 2 },
+  { source: 'Junction City', target: 'Site Pyoe yae', distance: 4 },
+  { source: 'Site Pyoe yae', target: 'Junction City', distance: 4 },
+  { source: 'Site Pyoe yae', target: 'Hledan', distance: 2 },
+  { source: 'Hledan', target: 'Site Pyoe yae', distance: 2 },
+  { source: 'Hledan', target: 'Thamine', distance: 3 },
+  { source: 'Thamine', target: 'Hledan', distance: 3 },
+  { source: 'Insein', target: 'Thamine', distance: 3 },
+  { source: 'Thamine', target: 'Insein', distance: 3 },
+  { source: 'Insein', target: 'Photkan', distance: 3 },
+  { source: 'Photkan', target: 'Insein', distance: 3 },
+  { source: 'DaNyinGone', target: 'Photkan', distance: 3 },
+  { source: 'Photkan', target: 'DaNyinGone', distance: 3 },
+  { source: 'DaNyinGone', target: 'ShwePyiTharGwe', distance: 4 },
+  { source: 'ShwePyiTharGwe', target: 'DaNyinGone', distance: 4 },
+  { source: 'UCSY', target: 'ShwePyiTharGwe', distance: 4 },
+  { source: 'ShwePyiTharGwe', target: 'UCSY', distance: 4 },
+
+  { source: 'Yangon International Airport', target: 'Yangon Central Station', distance: 10 },
+];
+
+// Create the graph
+function createGraph() {
+  var svg = d3.select('svg');
+
+  // Add edges
+  svg.selectAll('.edge')
+    .data(edges)
+    .enter()
+    .append('line')
+    .attr('class', 'edge')
+    .attr('x1', d => getBusStopByName(d.source).x)
+    .attr('y1', d => getBusStopByName(d.source).y)
+    .attr('x2', d => getBusStopByName(d.target).x)
+    .attr('y2', d => getBusStopByName(d.target).y)
+    .attr('distance', d => d.distance);
+
+  // Add edge labels (distances)
+  svg.selectAll('.edge-label')
+    .data(edges)
+    .enter()
+    .append('text')
+    .attr('class', 'edge-label')
+    .attr('x', d => (getBusStopByName(d.source).x + getBusStopByName(d.target).x) / 2)
+    .attr('y', d => (getBusStopByName(d.source).y + getBusStopByName(d.target).y) / 2)
+    .text(d => d.distance)
+    .attr('font-size', 12)
+    .attr('text-anchor', 'middle')
+    .attr('dominant-baseline', 'central');
+
+  // Add nodes
+  svg.selectAll('.node')
+    .data(busStops)
+    .enter()
+    .append('circle')
+    .attr('class', 'node')
+    .attr('cx', d => d.x)
+    .attr('cy', d => d.y)
+    .attr('r', 10);
+
+  // Add node labels (short names)
+  svg.selectAll('.node-label')
+    .data(busStops)
+    .enter()
+    .append('text')
+    .attr('class', 'node-label')
+    .attr('x', d => d.x)
+    .attr('y', d => d.y - 15)
+    .text(d => d.shortName)
+    .attr('font-size', 12)
+    .attr('text-anchor', 'middle')
+    .attr('dominant-baseline', 'central');
+}
+
+// Get bus stop by name
+function getBusStopByName(name) {
+  return busStops.find(stop => stop.name === name);
+}
+
+// Populate dropdowns with bus stop options
+function populateDropdowns() {
+  var startDropdown = document.getElementById('start');
+  var endDropdown = document.getElementById('end');
+
+  busStops.forEach(function(stop) {
+    var option1 = new Option(stop.name, stop.name);
+    var option2 = new Option(stop.name, stop.name);
+
+    startDropdown.add(option1);
+    endDropdown.add(option2);
+  });
+}
+
+// Calculate shortest path
+function calculateShortestPath() {
+  // Clear previous shortest path
+  var svg = d3.select('svg');
+  svg.selectAll('.edge').classed('shortest-path', false);
+
+  var startStop = document.getElementById('start').value;
+  var endStop = document.getElementById('end').value;
+
+  // Implement another shortest path algorithm
+  var shortestPath = anotherShortestPathAlgorithm(startStop, endStop);
+
+  // Highlight shortest path
+  highlightShortestPath(shortestPath);
+
+  // Calculate total distance of the route
+  var totalDistance = calculateTotalDistance(shortestPath);
+  document.getElementById('routeTotalDistance').innerText = totalDistance;
+}
+
+// Another shortest path algorithm implementation using Dijkstra's algorithm
+function anotherShortestPathAlgorithm(startStop, endStop) {
+  // Create a map to store distances from startStop to each bus stop
+  var distances = {};
+  // Initialize all distances to infinity except for startStop, which is 0
+  busStops.forEach(function(stop) {
+    distances[stop.name] = stop.name === startStop ? 0 : Infinity;
+  });
+
+  // Create a set to keep track of visited bus stops
+  var visited = new Set();
+
+  // Create a priority queue to store bus stops based on their distances
+  var queue = new PriorityQueue();
+  // Add startStop with distance 0 to the queue
+  queue.enqueue(startStop, 0);
+
+  // Create a map to store the previous bus stop on the shortest path
+  var previous = {};
+
+  // Dijkstra's algorithm
+  while (!queue.isEmpty()) {
+    // Dequeue the bus stop with the shortest distance from the queue
+    var currentStop = queue.dequeue().element;
+    // Mark the current bus stop as visited
+    visited.add(currentStop);
+
+    // If the current bus stop is the endStop, reconstruct and return the shortest path
+    if (currentStop === endStop) {
+      var path = [];
+      var stop = endStop;
+      while (stop !== startStop) {
+        path.unshift(stop);
+        stop = previous[stop];
+      }
+      path.unshift(startStop);
+      return path;
+    }
+
+    // Explore neighboring bus stops
+    edges.forEach(function(edge) {
+      if ((edge.source === currentStop || edge.target === currentStop) && !(visited.has(edge.source) && visited.has(edge.target))) {
+        // Identify the neighboring bus stop
+        var neighbor = edge.source === currentStop ? edge.target : edge.source;
+        // Calculate the distance from startStop to the neighboring bus stop via the current bus stop
+        var distance = distances[currentStop] + edge.distance;
+        // If this distance is shorter than the previously recorded distance, update it
+        if (distance < distances[neighbor]) {
+          distances[neighbor] = distance;
+          // Update the previous bus stop for the neighboring bus stop
+          previous[neighbor] = currentStop;
+          // Enqueue the neighboring bus stop with its updated distance
+          queue.enqueue(neighbor, distance);
+        }
+      }
+    });
+  }
+
+  // If no path is found, return an empty array
+  return [];
+}
+
+// Priority queue implementation
+function PriorityQueue() {
+  this.elements = [];
+}
+
+PriorityQueue.prototype.enqueue = function(element, priority) {
+  this.elements.push({ element: element, priority: priority });
+  this.elements.sort(function(a, b) {
+    return a.priority - b.priority;
+  });
+};
+
+PriorityQueue.prototype.dequeue = function() {
+  return this.elements.shift();
+};
+
+PriorityQueue.prototype.isEmpty = function() {
+  return this.elements.length === 0;
+};
+
+// Calculate total distance of the route
+function calculateTotalDistance(path) {
+  var totalDistance = 0;
+  for (var i = 0; i < path.length - 1; i++) {
+    var source = path[i];
+    var target = path[i + 1];
+    var edge = edges.find(function(edge) {
+      return (edge.source === source && edge.target === target) || (edge.source === target && edge.target === source);
+    });
+    totalDistance += edge.distance;
+  }
+  return totalDistance;
+}
+
+// Highlight shortest path
+function highlightShortestPath(path) {
+  var svg = d3.select('svg');
+
+  svg.selectAll('.edge')
+    .classed('shortest-path', function(d) {
+      return path.includes(d.source) && path.includes(d.target);
+    })
+    .style('stroke', function(d) {
+      return path.includes(d.source) && path.includes(d.target) ? 'green' : '#ccc';
+    })
+    .style('stroke-width', function(d) {
+      return path.includes(d.source) && path.includes(d.target) ? 10 : 6;
+    });
+}
+
+// Load functions when the page loads
+window.onload = function() {
+  createGraph();
+  populateDropdowns();
+};
+</script>
+</body>
+</html>
